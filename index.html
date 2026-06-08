@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mario 3D Game</title>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #5c94fc; font-family: 'Press Start 2P', monospace; }
+
+        #ui {
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 12px 20px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .hud-box {
+            background: rgba(0,0,0,0.55);
+            border: 3px solid #fff;
+            border-radius: 8px;
+            padding: 8px 14px;
+            color: #fff;
+            font-size: 9px;
+            line-height: 1.8;
+            text-shadow: 2px 2px 0 #000;
+            pointer-events: auto;
+        }
+
+        .hud-box .label { color: #ffd700; font-size: 7px; letter-spacing: 1px; }
+        .hud-box .value { font-size: 11px; }
+
+        #status {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            pointer-events: none;
+            z-index: 20;
+            display: none;
+        }
+
+        #status .win-text {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 28px;
+            color: #ffd700;
+            text-shadow: 4px 4px 0 #c00, 8px 8px 0 #000;
+            animation: bounce 0.5s infinite alternate;
+        }
+
+        #status .sub-text {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 11px;
+            color: #fff;
+            margin-top: 16px;
+            text-shadow: 2px 2px 0 #000;
+        }
+
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to   { transform: translateY(-12px); }
+        }
+
+        #controls-hint {
+            position: absolute;
+            bottom: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.5);
+            border: 2px solid rgba(255,255,255,0.4);
+            border-radius: 8px;
+            padding: 7px 18px;
+            color: rgba(255,255,255,0.85);
+            font-family: 'Press Start 2P', monospace;
+            font-size: 7px;
+            letter-spacing: 0.5px;
+            text-shadow: 1px 1px 0 #000;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        #btn-reset {
+            cursor: pointer;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            padding: 8px 14px;
+            background: #e52222;
+            color: #fff;
+            border: 3px solid #fff;
+            border-radius: 6px;
+            text-shadow: 1px 1px 0 #000;
+            box-shadow: 3px 3px 0 #000;
+            transition: transform 0.08s, box-shadow 0.08s;
+            pointer-events: auto;
+        }
+        #btn-reset:hover { background: #ff4444; }
+        #btn-reset:active { transform: translate(2px,2px); box-shadow: 1px 1px 0 #000; }
+
+        #loading-screen {
+            position: fixed;
+            inset: 0;
+            background: #1a1a2e;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            transition: opacity 0.6s;
+        }
+        #loading-screen .logo {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 32px;
+            color: #ffd700;
+            text-shadow: 4px 4px 0 #e52222, 8px 8px 0 #000;
+            margin-bottom: 30px;
+        }
+        #loading-screen .bar-wrap {
+            width: 260px;
+            height: 18px;
+            border: 3px solid #fff;
+            border-radius: 4px;
+            overflow: hidden;
+            background: #000;
+        }
+        #loading-screen .bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #e52222, #ffd700);
+            transition: width 0.3s;
+        }
+        #loading-screen .load-text {
+            font-family: 'Press Start 2P', monospace;
+            font-size: 8px;
+            color: #aaa;
+            margin-top: 14px;
+        }
+
+        /* Coin popup +100 */
+        .coin-popup {
+            position: fixed;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 13px;
+            color: #ffd700;
+            text-shadow: 2px 2px 0 #000;
+            pointer-events: none;
+            z-index: 50;
+            animation: coinPop 0.9s ease-out forwards;
+        }
+        @keyframes coinPop {
+            0%   { opacity: 1; transform: translateY(0) scale(1.2); }
+            100% { opacity: 0; transform: translateY(-60px) scale(0.8); }
+        }
+
+        /* Coin HUD flash */
+        @keyframes hudFlash {
+            0%, 100% { color: #ffd700; }
+            50%       { color: #fff; }
+        }
+        .flash { animation: hudFlash 0.3s ease; }
+    </style>
+</head>
+<body>
+
+<!-- Loading Screen -->
+<div id="loading-screen">
+    <div class="logo">MARIO 3D</div>
+    <div class="bar-wrap"><div class="bar" id="load-bar"></div></div>
+    <div class="load-text" id="load-text">LOADING...</div>
+</div>
+
+<!-- HUD -->
+<div id="ui">
+    <div class="hud-box">
+        <div class="label">PLAYER</div>
+        <div class="value">MARIO</div>
+        <br>
+        <div class="label">POSISI X</div>
+        <div class="value" id="pos-x">0</div>
+    </div>
+
+    <div style="display:flex; flex-direction:column; align-items:center; gap:8px;">
+        <div class="hud-box" style="text-align:center;">
+            <div class="label">STATUS</div>
+            <div class="value" id="game-status" style="color:#7fff7f;">BERJALAN</div>
+        </div>
+        <button id="btn-reset" onclick="resetGame()">↺ RESET</button>
+    </div>
+
+    <div class="hud-box" style="text-align:right;">
+        <div class="label">🪙 KOIN</div>
+        <div class="value" id="coin-count" style="color:#ffd700;">0 / 0</div>
+        <br>
+        <div class="label">⭐ SKOR</div>
+        <div class="value" id="score-count" style="color:#fff;">0</div>
+    </div>
+</div>
+
+<!-- Win Screen -->
+<div id="status">
+    <div class="win-text">🎉 YOU WIN! 🎉</div>
+    <div class="sub-text">Mario mencapai garis finish!</div>
+    <div class="sub-text" id="final-score" style="color:#ffd700; margin-top:10px; font-size:13px;"></div>
+</div>
+
+<!-- Controls Hint -->
+<div id="controls-hint">
+    ← → JALAN &nbsp;|&nbsp; ↑ / SPACE LOMPAT &nbsp;|&nbsp; KLIK MARIO → WARNA RANDOM
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+// ─── Loading bar helper ───────────────────────────────────────────────────────
+function setLoadProgress(pct, txt) {
+    document.getElementById('load-bar').style.width = pct + '%';
+    document.getElementById('load-text').textContent = txt;
+}
+function hideLoading() {
+    const el = document.getElementById('loading-screen');
+    el.style.opacity = '0';
+    setTimeout(() => el.style.display = 'none', 650);
+}
+
+// ─── I. Inisialisasi Scene, Kamera, Renderer ─────────────────────────────────
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x5c94fc); // Biru langit Mario klasik
+scene.fog = new THREE.Fog(0x5c94fc, 30, 80);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 200);
+camera.position.set(0, 4, 14);
+camera.lookAt(0, 1, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// ✅ FIX WARNA: Aktifkan output color space agar warna GLB tampil benar
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+document.body.appendChild(renderer.domElement);
+
+// Pencahayaan Ganda
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+scene.add(ambientLight);
+
+const dirLight = new THREE.DirectionalLight(0xfff5cc, 2.2);
+dirLight.position.set(10, 20, 10);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(1024, 1024);
+dirLight.shadow.camera.left = -30;
+dirLight.shadow.camera.right = 30;
+dirLight.shadow.camera.near = 0.5;
+dirLight.shadow.camera.far = 80;
+scene.add(dirLight);
+
+// ─── II. Objek Dunia Game ─────────────────────────────────────────────────────
+
+// Tanah panjang (Platform)
+const TANAH_PANJANG = 60;
+const tanahGeo = new THREE.BoxGeometry(TANAH_PANJANG, 1, 6);
+const tanahMat = new THREE.MeshLambertMaterial({ color: 0x8B5E3C });
+const tanah = new THREE.Mesh(tanahGeo, tanahMat);
+tanah.position.set(TANAH_PANJANG / 2 - 5, -0.5, 0);
+tanah.receiveShadow = true;
+scene.add(tanah);
+
+// Garis hijau di atas tanah
+const rumputGeo = new THREE.BoxGeometry(TANAH_PANJANG, 0.25, 6.1);
+const rumputMat = new THREE.MeshLambertMaterial({ color: 0x5aaf2a });
+const rumput = new THREE.Mesh(rumputGeo, rumputMat);
+rumput.position.set(TANAH_PANJANG / 2 - 5, 0.12, 0);
+rumput.receiveShadow = true;
+scene.add(rumput);
+
+// Beberapa platform melayang — simpan referensi untuk collision
+const platforms = []; // { minX, maxX, topY }
+
+// Tanah utama sebagai platform pertama
+platforms.push({ minX: -5, maxX: TANAH_PANJANG - 5, topY: 0 });
+
+const platData = [
+    { x: 8,  y: 3,   w: 4 },
+    { x: 16, y: 4.5, w: 3 },
+    { x: 25, y: 3,   w: 5 },
+    { x: 34, y: 5,   w: 3 },
+    { x: 42, y: 3.5, w: 4 }
+];
+platData.forEach(p => {
+    const platHeight = 0.8;
+    const g = new THREE.BoxGeometry(p.w, platHeight, 3);
+    const m = new THREE.MeshLambertMaterial({ color: 0xc8a050 });
+    const mesh = new THREE.Mesh(g, m);
+    mesh.position.set(p.x, p.y, 0);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+
+    // Garis hijau di atas platform
+    const rg = new THREE.BoxGeometry(p.w, 0.2, 3.1);
+    const rm = new THREE.MeshLambertMaterial({ color: 0x5aaf2a });
+    const rMesh = new THREE.Mesh(rg, rm);
+    rMesh.position.set(p.x, p.y + platHeight / 2 + 0.1, 0);
+    scene.add(rMesh);
+
+    // Simpan data collision: topY = posisi Y atas platform
+    platforms.push({
+        minX: p.x - p.w / 2,
+        maxX: p.x + p.w / 2,
+        topY: p.y + platHeight / 2
+    });
+});
+
+// ─── SISTEM KOIN ─────────────────────────────────────────────────────────────
+const coins = [];      // { mesh, collected, baseY }
+let score = 0;
+let totalCoins = 0;
+
+// Data posisi koin: { x, y } — tersebar di tanah & atas platform
+const coinData = [
+    // Di tanah
+    { x: 3,  y: 1.0 }, { x: 5,  y: 1.0 }, { x: 7,  y: 1.0 },
+    { x: 12, y: 1.0 }, { x: 14, y: 1.0 },
+    { x: 20, y: 1.0 }, { x: 22, y: 1.0 }, { x: 24, y: 1.0 },
+    { x: 29, y: 1.0 }, { x: 31, y: 1.0 },
+    { x: 37, y: 1.0 }, { x: 39, y: 1.0 },
+    { x: 44, y: 1.0 }, { x: 46, y: 1.0 },
+    // Di atas platform melayang
+    { x: 7,  y: 4.2 }, { x: 8,  y: 4.2 }, { x: 9,  y: 4.2 },   // platform x=8 y=3
+    { x: 15, y: 5.7 }, { x: 16, y: 5.7 }, { x: 17, y: 5.7 },   // platform x=16 y=4.5
+    { x: 24, y: 4.2 }, { x: 25, y: 4.2 }, { x: 26, y: 4.2 },   // platform x=25 y=3
+    { x: 33, y: 6.2 }, { x: 34, y: 6.2 }, { x: 35, y: 6.2 },   // platform x=34 y=5
+    { x: 41, y: 4.7 }, { x: 42, y: 4.7 }, { x: 43, y: 4.7 },   // platform x=42 y=3.5
+];
+
+function buatKoin(x, y) {
+    const group = new THREE.Group();
+
+    // Koin: silinder pipih warna emas
+    const geo = new THREE.CylinderGeometry(0.35, 0.35, 0.12, 16);
+    const mat = new THREE.MeshLambertMaterial({ color: 0xffd700, emissive: 0xffa500, emissiveIntensity: 0.4 });
+    const mesh = new THREE.Mesh(geo, mat);
+    // Hadapkan koin ke depan (rotasi 90° agar terlihat lingkaran dari samping)
+    mesh.rotation.x = Math.PI / 2;
+    group.add(mesh);
+
+    // Kilap tengah koin
+    const innerGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.13, 12);
+    const innerMat = new THREE.MeshLambertMaterial({ color: 0xffee88, emissive: 0xffcc00, emissiveIntensity: 0.6 });
+    const innerMesh = new THREE.Mesh(innerGeo, innerMat);
+    innerMesh.rotation.x = Math.PI / 2;
+    group.add(innerMesh);
+
+    group.position.set(x, y, 0);
+    scene.add(group);
+
+    coins.push({ mesh: group, collected: false, baseY: y });
+    totalCoins++;
+}
+
+coinData.forEach(c => buatKoin(c.x, c.y));
+
+// Update HUD koin
+function updateCoinHUD() {
+    const el = document.getElementById('coin-count');
+    el.textContent = score/100 + ' / ' + totalCoins;
+    document.getElementById('score-count').textContent = score;
+    // Flash animasi
+    el.classList.remove('flash');
+    void el.offsetWidth; // reflow trick
+    el.classList.add('flash');
+}
+updateCoinHUD();
+
+// Popup "+100" di layar
+function showCoinPopup() {
+    const popup = document.createElement('div');
+    popup.className = 'coin-popup';
+    popup.textContent = '+100';
+    popup.style.left = (window.innerWidth / 2 + (Math.random() * 60 - 30)) + 'px';
+    popup.style.top  = (window.innerHeight / 2 - 60) + 'px';
+    document.body.appendChild(popup);
+    setTimeout(() => popup.remove(), 950);
+}
+
+// Cek apakah Mario menyentuh koin
+function cekKoin() {
+    if(!mario) return;
+    const JARAK_AMBIL = 1.0; // radius pengambilan koin
+    for(const koin of coins) {
+        if(koin.collected) continue;
+        const dx = mario.position.x - koin.mesh.position.x;
+        const dy = mario.position.y - koin.mesh.position.y + 1; // +1 offset ke tengah badan
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if(dist < JARAK_AMBIL) {
+            koin.collected = true;
+            scene.remove(koin.mesh);
+            score += 100;
+            updateCoinHUD();
+            showCoinPopup();
+        }
+    }
+}
+function buatAwan(x, y) {
+    const g = new THREE.Group();
+    [[0,0,1.2],[1.1,0.4,0.9],[-1.1,0.4,0.9],[0,0.7,0.85]].forEach(([cx,cy,r]) => {
+        const sphere = new THREE.Mesh(
+            new THREE.SphereGeometry(r, 8, 6),
+            new THREE.MeshLambertMaterial({ color: 0xffffff })
+        );
+        sphere.position.set(cx, cy, -4);
+        g.add(sphere);
+    });
+    g.position.set(x, y, 0);
+    scene.add(g);
+}
+buatAwan(5, 10); buatAwan(18, 12); buatAwan(30, 11); buatAwan(44, 10);
+
+// Garis Finish (Tiang + Bendera)
+const FINISH_X = 48;
+const tiangGeo = new THREE.CylinderGeometry(0.12, 0.12, 8, 12);
+const tiangMat = new THREE.MeshLambertMaterial({ color: 0xdddddd });
+const tiang = new THREE.Mesh(tiangGeo, tiangMat);
+tiang.position.set(FINISH_X, 3.5, 0);
+tiang.castShadow = true;
+scene.add(tiang);
+
+const benderaGeo = new THREE.BoxGeometry(1.8, 1.2, 0.1);
+const benderaMat = new THREE.MeshLambertMaterial({ color: 0xe52222 });
+const bendera = new THREE.Mesh(benderaGeo, benderaMat);
+bendera.position.set(FINISH_X + 0.9, 7.2, 0);
+scene.add(bendera);
+
+// Teks "FINISH" sederhana (plane)
+const textGeo = new THREE.BoxGeometry(4, 0.6, 0.1);
+const textMat = new THREE.MeshLambertMaterial({ color: 0xffd700 });
+const textMesh = new THREE.Mesh(textGeo, textMat);
+textMesh.position.set(FINISH_X, 8.5, 0);
+scene.add(textMesh);
+
+// ─── III. Karakter Mario (GLTFLoader) ────────────────────────────────────────
+let mario = null;
+let mixer = null;
+let marioHeight = 2.2; // Tinggi Mario, diupdate setelah GLB dimuat
+const clock = new THREE.Clock();
+
+const GROUND_Y = 0; // Y permukaan tanah
+let currentFloorY = GROUND_Y; // Lantai yang sedang Mario injak
+let velY = 0;
+const GRAVITY = -0.014;
+const JUMP_FORCE = 0.45;
+let onGround = true;
+let jumpCount = 0;
+const MAX_JUMP = 2;
+
+let isFinished = false;
+let celebrationAngle = 0;
+// Simpan warna asli tiap mesh untuk reset
+const originalColors = new Map();
+
+const keys = { ArrowLeft: false, ArrowRight: false, ArrowUp: false, Space: false };
+
+setLoadProgress(20, 'MEMUAT MARIO...');
+
+const loader = new GLTFLoader();
+loader.load(
+    'mario.glb',
+    function(gltf) {
+        mario = gltf.scene;
+
+        // ✅ FIX WARNA: Aktifkan encoding texture agar warna asli GLB muncul
+        mario.traverse(c => {
+            if(c.isMesh) {
+                c.castShadow = true;
+                // Aktifkan encoding warna pada semua texture
+                if(c.material.map) c.material.map.colorSpace = THREE.SRGBColorSpace;
+                if(c.material.emissiveMap) c.material.emissiveMap.colorSpace = THREE.SRGBColorSpace;
+                c.material.needsUpdate = true;
+                // Simpan warna asli untuk reset nanti
+                originalColors.set(c.uuid, c.material.color ? c.material.color.getHex() : null);
+            }
+        });
+
+        // Auto-scale
+        const box = new THREE.Box3().setFromObject(mario);
+        const size = box.getSize(new THREE.Vector3());
+        const maxDim = Math.max(size.x, size.y, size.z);
+        const scaleFactor = 2.2 / maxDim;
+        mario.scale.setScalar(scaleFactor);
+
+        // ✅ FIX NAPAK: Hitung ulang bounding box setelah scale
+        // Posisikan Mario sehingga kaki tepat di GROUND_Y
+        const boxScaled = new THREE.Box3().setFromObject(mario);
+        const sizeScaled = boxScaled.getSize(new THREE.Vector3());
+        const minYScaled = boxScaled.min.y;
+        marioHeight = sizeScaled.y;
+
+        // Geser pivot agar kaki = 0
+        mario.position.y = GROUND_Y - minYScaled;
+        mario.position.x = 0;
+        mario.position.z = 0;
+
+        scene.add(mario);
+
+        // Animasi bawaan GLB
+        if(gltf.animations && gltf.animations.length > 0) {
+            mixer = new THREE.AnimationMixer(mario);
+            gltf.animations.forEach(clip => mixer.clipAction(clip).play());
+            console.log(gltf.animations.length + ' animasi bawaan dijalankan');
+        }
+
+        setLoadProgress(100, 'SIAP!');
+        setTimeout(hideLoading, 500);
+    },
+    function(xhr) {
+        const pct = Math.round(20 + (xhr.loaded / (xhr.total || 1)) * 70);
+        setLoadProgress(pct, 'MEMUAT MARIO... ' + pct + '%');
+    },
+    function(err) {
+        console.warn('GLB tidak ditemukan, pakai Mario kotak:', err);
+        buatMarioKotak();
+        setLoadProgress(100, 'SIAP! (FALLBACK)');
+        setTimeout(hideLoading, 500);
+    }
+);
+
+// Fallback: Mario dari BoxGeometry jika GLB tidak ada
+function buatMarioKotak() {
+    mario = new THREE.Group();
+
+    // Badan merah
+    const badan = new THREE.Mesh(
+        new THREE.BoxGeometry(0.9, 1.1, 0.6),
+        new THREE.MeshLambertMaterial({ color: 0xe52222 })
+    );
+    badan.position.y = 0.8;
+    mario.add(badan);
+
+    // Celana biru
+    const celana = new THREE.Mesh(
+        new THREE.BoxGeometry(0.9, 0.6, 0.62),
+        new THREE.MeshLambertMaterial({ color: 0x1a3ed4 })
+    );
+    celana.position.y = 0.15;
+    mario.add(celana);
+
+    // Kepala
+    const kepala = new THREE.Mesh(
+        new THREE.BoxGeometry(0.85, 0.85, 0.7),
+        new THREE.MeshLambertMaterial({ color: 0xf5cba7 })
+    );
+    kepala.position.y = 1.8;
+    mario.add(kepala);
+
+    // Topi merah
+    const topi = new THREE.Mesh(
+        new THREE.BoxGeometry(0.95, 0.35, 0.75),
+        new THREE.MeshLambertMaterial({ color: 0xe52222 })
+    );
+    topi.position.y = 2.38;
+    mario.add(topi);
+
+    mario.position.set(0, GROUND_Y, 0);
+    mario.traverse(c => { if(c.isMesh) c.castShadow = true; });
+    scene.add(mario);
+}
+
+// ─── IV. Raycaster (Klik & Hover) ────────────────────────────────────────────
+const raycaster = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+
+renderer.domElement.addEventListener('mousemove', (e) => {
+    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+    if(!mario) return;
+    raycaster.setFromCamera(mouse, camera);
+    const hits = raycaster.intersectObjects(mario.children, true);
+    renderer.domElement.style.cursor = hits.length > 0 ? 'pointer' : 'default';
+});
+
+renderer.domElement.addEventListener('click', (e) => {
+
+    if(!mario || isFinished) return;
+
+    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+    mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+
+    raycaster.setFromCamera(mouse, camera);
+
+    const hits = raycaster.intersectObjects(
+        mario.children,
+        true
+    );
+
+    if(hits.length > 0){
+
+        const warnaRandom = Math.random() * 0xffffff;
+
+        mario.traverse(child => {
+
+            if(
+                child.isMesh &&
+                child.material &&
+                child.material.emissive
+            ){
+                child.material.emissive.setHex(warnaRandom);
+            }
+
+        });
+
+    }
+
+});
+
+// ─── V. Keyboard Input ───────────────────────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+    if(e.code in keys) { keys[e.code] = true; e.preventDefault(); }
+    if(e.key === ' ') { keys['Space'] = true; e.preventDefault(); }
+});
+document.addEventListener('keyup', (e) => {
+    if(e.code in keys) keys[e.code] = false;
+    if(e.key === ' ') keys['Space'] = false;
+});
+
+// ─── Reset Game ───────────────────────────────────────────────────────────────
+window.resetGame = function() {
+    if(!mario) return;
+    mario.position.set(0, GROUND_Y, 0);
+    mario.rotation.y = 0;
+    mario.position.z = 0;
+    velY = 0;
+    onGround = true;
+    currentFloorY = GROUND_Y;
+    isFinished = false;
+    celebrationAngle = 0;
+
+    // Reset koin
+    score = 0;
+    for(const koin of coins) {
+        if(koin.collected) {
+            koin.collected = false;
+            scene.add(koin.mesh);
+        }
+    }
+    updateCoinHUD();
+    // ✅ Kembalikan warna ASLI dari GLB (bukan putih)
+    mario.traverse(child => {
+        if(child.isMesh && child.material) {
+            const orig = originalColors.get(child.uuid);
+            if(orig !== null && orig !== undefined && child.material.color) {
+                child.material.color.setHex(orig);
+            }
+            if(child.material.emissive) child.material.emissive.setHex(0x000000);
+        }
+    });
+    document.getElementById('status').style.display = 'none';
+    document.getElementById('game-status').textContent = 'BERJALAN';
+    document.getElementById('game-status').style.color = '#7fff7f';
+};
+
+// ─── VI. Animasi Loop (Physics + Camera Tracking + Finish Detection) ──────────
+const SPEED = 0.1;
+
+// ✅ Fungsi deteksi platform yang sedang diinjak Mario
+function getPlatformBelow(marioX, marioY) {
+    // Cek semua platform dari atas ke bawah
+    let bestPlatform = null;
+    let bestTopY = -Infinity;
+
+    for(const p of platforms) {
+        const halfW = 0.6; // setengah lebar kaki Mario (toleransi)
+        const isAbovePlatform = marioX + halfW > p.minX && marioX - halfW < p.maxX;
+        // Mario harus berada di atas atau tepat di permukaan platform
+        const isOnTop = marioY >= p.topY - 0.3 && marioY <= p.topY + 0.5;
+
+        if(isAbovePlatform && isOnTop && p.topY > bestTopY) {
+            bestTopY = p.topY;
+            bestPlatform = p;
+        }
+    }
+    return bestPlatform;
+}
+
+function animate() {
+    requestAnimationFrame(animate);
+
+    const delta = clock.getDelta();
+    if(mixer) mixer.update(delta);
+
+    if(mario && !isFinished) {
+        // Pergerakan horizontal
+        if(keys.ArrowRight) {
+            mario.position.x += SPEED;
+            mario.rotation.y = Math.PI / 2;
+        }
+        if(keys.ArrowLeft) {
+            mario.position.x -= SPEED;
+            mario.rotation.y = -Math.PI / 2;
+        }
+
+        // Lompatan
+        if((keys.ArrowUp || keys.Space) && jumpCount < MAX_JUMP) {
+            velY = JUMP_FORCE;
+            onGround = false;
+            jumpCount++;
+        }
+
+        // Terapkan gravitasi
+        velY += GRAVITY;
+        mario.position.y += velY;
+
+        // ✅ FIX NAPAK: Deteksi platform di bawah Mario
+        const platBelow = getPlatformBelow(mario.position.x, mario.position.y);
+
+        if(platBelow && velY < 0) {
+            // Kaki Mario tepat di atas permukaan platform
+            mario.position.y = platBelow.topY;
+            velY = 0;
+            onGround = true;
+            jumpCount = 0;
+            currentFloorY = platBelow.topY;
+        }
+
+        // Jika tidak ada platform & jatuh ke bawah tanah dasar
+        if(mario.position.y < GROUND_Y && !platBelow) {
+            mario.position.y = GROUND_Y;
+            velY = 0;
+            onGround = true;
+            jumpCount = 0;
+            currentFloorY = GROUND_Y;
+        }
+
+        // Update HUD
+        document.getElementById('pos-x').textContent = Math.round(mario.position.x);
+
+        // Cek pengambilan koin
+        cekKoin();
+
+        // Camera Tracking
+        camera.position.x += (mario.position.x - camera.position.x) * 0.08;
+        camera.position.y += (mario.position.y + 4 - camera.position.y) * 0.05;
+        camera.lookAt(mario.position.x, mario.position.y + 1.5, 0);
+
+        // Deteksi Finish
+        if(mario.position.x >= FINISH_X) {
+            isFinished = true;
+            document.getElementById('status').style.display = 'block';
+            document.getElementById('game-status').textContent = '🎉 FINISH!';
+            document.getElementById('game-status').style.color = '#ffd700';
+            const coinCollected = coins.filter(c => c.collected).length;
+            document.getElementById('final-score').textContent =
+                '🪙 ' + coinCollected + '/' + totalCoins + ' koin  ⭐ SKOR: ' + score;
+        }
+
+    } else if(mario && isFinished) {
+        // Animasi selebrasi
+        celebrationAngle += 0.05;
+        mario.position.x = FINISH_X + Math.cos(celebrationAngle) * 1.5;
+        mario.position.z = Math.sin(celebrationAngle) * 1.5;
+        mario.rotation.y += 0.08;
+
+        camera.position.x += (FINISH_X - camera.position.x) * 0.04;
+        camera.position.y += (5 - camera.position.y) * 0.04;
+        camera.lookAt(FINISH_X, 3, 0);
+    }
+
+    // Animasi koin berputar & melayang naik-turun
+    const t = clock.getElapsedTime();
+    for(const koin of coins) {
+        if(!koin.collected) {
+            koin.mesh.rotation.y += 0.04;
+            koin.mesh.position.y = koin.baseY + Math.sin(t * 2 + koin.baseY) * 0.15;
+        }
+    }
+
+    // Bendera berkibar
+    bendera.rotation.y = Math.sin(clock.getElapsedTime() * 3) * 0.15;
+
+    renderer.render(scene, camera);
+}
+
+animate();
+
+// Resize responsif
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
