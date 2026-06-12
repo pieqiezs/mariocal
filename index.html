@@ -224,7 +224,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
-// ─── Loading bar helper ───────────────────────────────────────────────────────
+// ─── Loading bar helper 
 function setLoadProgress(pct, txt) {
     document.getElementById('load-bar').style.width = pct + '%';
     document.getElementById('load-text').textContent = txt;
@@ -235,7 +235,7 @@ function hideLoading() {
     setTimeout(() => el.style.display = 'none', 650);
 }
 
-// ─── I. Inisialisasi Scene, Kamera, Renderer ─────────────────────────────────
+// ─── I. Inisialisasi Scene, Kamera, Renderer 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x5c94fc); // Biru langit Mario klasik
 scene.fog = new THREE.Fog(0x5c94fc, 30, 80);
@@ -268,7 +268,7 @@ dirLight.shadow.camera.near = 0.5;
 dirLight.shadow.camera.far = 80;
 scene.add(dirLight);
 
-// ─── II. Objek Dunia Game ─────────────────────────────────────────────────────
+// ─── II. Objek Dunia Game 
 
 // Tanah panjang (Platform)
 const TANAH_PANJANG = 60;
@@ -325,7 +325,7 @@ platData.forEach(p => {
     });
 });
 
-// ─── SISTEM KOIN ─────────────────────────────────────────────────────────────
+// ─── SISTEM KOIN 
 const coins = [];      // { mesh, collected, baseY }
 let score = 0;
 let totalCoins = 0;
@@ -452,7 +452,7 @@ const textMesh = new THREE.Mesh(textGeo, textMat);
 textMesh.position.set(FINISH_X, 8.5, 0);
 scene.add(textMesh);
 
-// ─── III. Karakter Mario (GLTFLoader) ────────────────────────────────────────
+// ─── III. Karakter Mario (GLTFLoader) 
 let mario = null;
 let mixer = null;
 let marioHeight = 2.2; // Tinggi Mario, diupdate setelah GLB dimuat
@@ -482,7 +482,7 @@ loader.load(
     function(gltf) {
         mario = gltf.scene;
 
-        // ✅ FIX WARNA: Aktifkan encoding texture agar warna asli GLB muncul
+        //  FIX WARNA: Aktifkan encoding texture agar warna asli GLB muncul
         mario.traverse(c => {
             if(c.isMesh) {
                 c.castShadow = true;
@@ -502,7 +502,7 @@ loader.load(
         const scaleFactor = 2.2 / maxDim;
         mario.scale.setScalar(scaleFactor);
 
-        // ✅ FIX NAPAK: Hitung ulang bounding box setelah scale
+        //  FIX NAPAK: Hitung ulang bounding box setelah scale
         // Posisikan Mario sehingga kaki tepat di GROUND_Y
         const boxScaled = new THREE.Box3().setFromObject(mario);
         const sizeScaled = boxScaled.getSize(new THREE.Vector3());
